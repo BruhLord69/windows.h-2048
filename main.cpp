@@ -16,31 +16,24 @@
 #include <stdlib.h>
 #include <time.h>
 
-using namespace std;
+//using namespace std;
 /*  Declare Windows procedure  */
 LRESULT CALLBACK WindowProcedure (HWND, UINT, WPARAM, LPARAM);
 
 void AddMenu(HWND);
 void GamePaint(char, HWND);
-void drawBoard(HWND);
-
+void GameArea(HWND);
 int pickColor(int, int);
+int normalizeWindowSize(int);
 
 HMENU hMenu;
 char input;
-int possiblePositions[16][4] =
-{
-    {10, 10, 105, 105},     {105, 10, 210, 105},    {210, 10, 315, 105},    {315, 10, 420, 105},
-    //
-    {10, 105, 105, 210},    {105, 105, 210, 210},   {210, 105, 315, 210},   {315, 105, 420, 210},
-    //
-    {10, 210, 105, 315},    {105, 210, 210, 315},   {210, 210, 315, 315},   {315, 210, 420, 315},
-    //
-    {10, 315, 105, 420},    {105, 315, 210, 420},   {210, 315, 315, 420},   {315, 315, 420, 420},
-    //
-};
-int position;
-int valueInPosition[9];
+int rectPositions[16][4];
+int textPositions[16][4];
+int valueInPosition[16];
+int curPos;
+int right;
+int bot;
 
 /*  Make the class name into a global variable  */
 TCHAR szClassName[ ] = _T("CodeBlocksWindowsApp");
@@ -81,7 +74,7 @@ int WINAPI WinMain (HINSTANCE hThisInstance,
                0,                   /* Extended possibilites for variation */
                szClassName,         /* Classname */
                _T("Dano App"),       /* Title Text */
-               WS_SYSMENU,          /* default window *changed to non-resizable */
+               WS_OVERLAPPEDWINDOW  ,          /* default window *changed to non-resizable */
                CW_USEDEFAULT,       /* Windows decides the position */
                CW_USEDEFAULT,       /* where the window ends up on the screen */
                435,                 /* The programs width */
@@ -139,8 +132,8 @@ LRESULT CALLBACK WindowProcedure (HWND hwnd, UINT message, WPARAM wParam, LPARAM
         HDC hDC;
         PAINTSTRUCT Ps;
         hDC = BeginPaint(hwnd, &Ps);
-        Rectangle(hDC, 10, 10, 420, 420);
-        //drawBoard(hwnd);
+        //Rectangle(hDC, 10, 10, 420, 420);
+        GameArea(hwnd);
         EndPaint(hwnd, &Ps);
     }
     case WM_KEYDOWN:
@@ -163,6 +156,7 @@ LRESULT CALLBACK WindowProcedure (HWND hwnd, UINT message, WPARAM wParam, LPARAM
     }
     case WM_CREATE:
         AddMenu(hwnd);
+        GamePaint('W', hwnd);
         break;
     case WM_DESTROY:
         PostQuitMessage (0);       /* send a WM_QUIT to the message queue */
@@ -185,24 +179,68 @@ void AddMenu(HWND hwnd)
 
     SetMenu(hwnd, hMenu);
 }
-void drawBoard(HWND hwnd)
+void GameArea(HWND hwnd)
 {
     HDC hDC = GetDC(hwnd);
-    int lengthOfDim1 = (sizeof(possiblePositions)/sizeof(possiblePositions[0]));
+    HBRUSH hBrush;
+    hBrush = CreateSolidBrush (RGB(212, 156, 180));
+    RECT rect;
+    GetClientRect(hwnd,&rect);
 
-    for(int i = 0; i<lengthOfDim1; i++)
+    int width = rect.right;
+    int height = rect.bottom;
+    //std::cout<<"Original right: "<<width<<" OG BOT: "<<height<<" ";
+    //width: 429 height: 431
+    //428 / 2 = 214
+    // 408 / 2 = 202
+    // left = middle - half
+    // right = middle + half
+    //
+
+    width = normalizeWindowSize(width);
+    height = normalizeWindowSize(height);
+    //cout<<"After change right: "<<width<<" After change BOT: "<<height<<" ";
+    if(width == height)
     {
-        Rectangle(hDC, possiblePositions[i][0], possiblePositions[i][1], possiblePositions[i][2], possiblePositions[i][3]);
+        right = width - 10;
+        bot = height - 10;
     }
-}
+    else if (width > height)
+    {
+        right = height - 10;
+        bot = height - 10;
+    }
+    else
+    {
+        right = width - 10;
+        bot = width - 10;
+    }
 
+    RECT window;
+    window.left = 10;
+    window.top = 10;
+    window.right = right;
+    window.bottom = bot;
+    FillRect(hDC, &window, hBrush);
+
+    ReleaseDC(hwnd,hDC);
+    std::cout<<"right: "<< right<<" Client window bot: "<<height<<" bot: "<<bot<<std::endl;
+}
+int normalizeWindowSize(int size)
+{
+    while(size % 2 != 0)
+    {
+        size--;
+    }
+    return size;
+}
+void calculatePositions();
 void GamePaint(char input, HWND hwnd) //create animations, make buttons do actions
 {
     HDC hDC = GetDC(hwnd);
     PAINTSTRUCT Ps;
-
-    int positionDim1 = rand() % 16;
-    if(input == 'W')
+    //int positionDim1 = rand() % 16;
+    /*if(input == 'W')
     {
         if(valueInPosition[positionDim1] * 2 == 2048)
         {
@@ -211,6 +249,7 @@ void GamePaint(char input, HWND hwnd) //create animations, make buttons do actio
         }
         else if (valueInPosition[positionDim1]!= 0) valueInPosition[positionDim1] *= 2; // game should end at 2048
         else valueInPosition[positionDim1] = 2;
+        cout<<" Pos: "<<positionDim1<<" Val: "<<valueInPosition[positionDim1]<<endl;
         string RectangleValue = to_string(valueInPosition[positionDim1]);;
         HBRUSH hBrush;
         int R = pickColor(valueInPosition[positionDim1], 0);
@@ -244,7 +283,11 @@ void GamePaint(char input, HWND hwnd) //create animations, make buttons do actio
         UpdateWindow(hwnd);
     }
     ReleaseDC(hwnd, hDC);
-    EndPaint(hwnd, &Ps);
+    EndPaint(hwnd, &Ps);*/
+    if(input == 'A')
+    {
+        GameArea(hwnd);
+    }
 }
 void calculateNewPositions() //function to recalculate new positions
 {
@@ -252,10 +295,10 @@ void calculateNewPositions() //function to recalculate new positions
 }
 void setPosition() //function to generate a new number
 {
-    position = rand() % 16;
+    curPos = rand() % 16;
 }
 int getPosition() {
-    return position;
+    return curPos;
 }
 void updateSquareValue()
 {

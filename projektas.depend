@@ -1,5 +1,5 @@
 # depslib dependency file v1.0
-1600811421 source:c:\users\alisa\desktop\api projektas\projektas\main.cpp
+1601055883 source:c:\users\alisa\desktop\api projektas\projektas\main.cpp
 	<iostream>
 	<tchar.h>
 	<windows.h>
