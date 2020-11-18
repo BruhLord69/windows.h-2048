@@ -21,26 +21,33 @@ using namespace std;
 LRESULT CALLBACK WindowProcedure (HWND, UINT, WPARAM, LPARAM);
 
 void AddMenu(HWND);
+void NewGame();
 void GamePaint(char, HWND);
-void drawBoard(HWND);
-
-int pickColor(int, int);
+void DrawBoard(HWND);
+void North();
+void South();
+void East();
+void West();
+void Test(HWND);
+void CreateNewSquare();
+void RedrawBoard(HWND);
+bool CheckForValidMoves();
+int PickColor(int, int);
 
 HMENU hMenu;
-char input;
-int possiblePositions[16][4] =
+char g_input;
+int g_possible_positions[4][4][4] =
 {
-    {10, 10, 105, 105},     {105, 10, 210, 105},    {210, 10, 315, 105},    {315, 10, 420, 105},
+    {{10, 10, 105, 105},     {105, 10, 210, 105},    {210, 10, 315, 105},    {315, 10, 420, 105}},
     //
-    {10, 105, 105, 210},    {105, 105, 210, 210},   {210, 105, 315, 210},   {315, 105, 420, 210},
+    {{10, 105, 105, 210},    {105, 105, 210, 210},   {210, 105, 315, 210},   {315, 105, 420, 210}},
     //
-    {10, 210, 105, 315},    {105, 210, 210, 315},   {210, 210, 315, 315},   {315, 210, 420, 315},
+    {{10, 210, 105, 315},    {105, 210, 210, 315},   {210, 210, 315, 315},   {315, 210, 420, 315}},
     //
-    {10, 315, 105, 420},    {105, 315, 210, 420},   {210, 315, 315, 420},   {315, 315, 420, 420},
+    {{10, 315, 105, 420},    {105, 315, 210, 420},   {210, 315, 315, 420},   {315, 315, 420, 420}},
     //
 };
-int position;
-int valueInPosition[9];
+int g_value_in_position[4][4] = {0};
 
 /*  Make the class name into a global variable  */
 TCHAR szClassName[ ] = _T("CodeBlocksWindowsApp");
@@ -81,11 +88,11 @@ int WINAPI WinMain (HINSTANCE hThisInstance,
                0,                   /* Extended possibilites for variation */
                szClassName,         /* Classname */
                _T("Dano App"),       /* Title Text */
-               WS_SYSMENU,          /* default window *changed to non-resizable */
+               WS_OVERLAPPEDWINDOW,          /* default window *changed to non-resizable */
                CW_USEDEFAULT,       /* Windows decides the position */
                CW_USEDEFAULT,       /* where the window ends up on the screen */
-               435,                 /* The programs width */
-               480,                 /* and height in pixels */
+               445,                 /* The programs width */
+               490,                 /* and height in pixels */
                HWND_DESKTOP,        /* The window is a child-window to desktop */
                NULL,                /* No menu */
                hThisInstance,       /* Program Instance handler */
@@ -122,8 +129,9 @@ LRESULT CALLBACK WindowProcedure (HWND hwnd, UINT message, WPARAM wParam, LPARAM
             DestroyWindow(hwnd);
             break;
         case FILE_MENU_NEW:
-            //WM_PAINT;
-            MessageBeep(MB_DEFBUTTON1);
+            NewGame();
+            RedrawBoard(hwnd);
+            //MessageBeep(MB_DEFBUTTON1);
             break;
         case FILE_MENU_BACK:
             MessageBeep(MB_DEFBUTTON2);
@@ -139,8 +147,7 @@ LRESULT CALLBACK WindowProcedure (HWND hwnd, UINT message, WPARAM wParam, LPARAM
         HDC hDC;
         PAINTSTRUCT Ps;
         hDC = BeginPaint(hwnd, &Ps);
-        Rectangle(hDC, 10, 10, 420, 420);
-        //drawBoard(hwnd);
+        Rectangle(hDC, 9, 9, 421, 421);
         EndPaint(hwnd, &Ps);
     }
     case WM_KEYDOWN:
@@ -158,6 +165,9 @@ LRESULT CALLBACK WindowProcedure (HWND hwnd, UINT message, WPARAM wParam, LPARAM
             break;
         case 'D':
             GamePaint('D', hwnd);
+            break;
+        case 'T':
+            GamePaint('T', hwnd);
             break;
         }
     }
@@ -185,112 +195,282 @@ void AddMenu(HWND hwnd)
 
     SetMenu(hwnd, hMenu);
 }
-void drawBoard(HWND hwnd)
+void NewGame()
 {
-    HDC hDC = GetDC(hwnd);
-    int lengthOfDim1 = (sizeof(possiblePositions)/sizeof(possiblePositions[0]));
-
-    for(int i = 0; i<lengthOfDim1; i++)
+    for(int i=0; i<4; i++)
     {
-        Rectangle(hDC, possiblePositions[i][0], possiblePositions[i][1], possiblePositions[i][2], possiblePositions[i][3]);
+        for(int j=0; j<4; j++)
+        {
+            g_value_in_position[i][j] = 0;
+        }
     }
 }
-
-void GamePaint(char input, HWND hwnd) //create animations, make buttons do actions
+void GamePaint(char g_input, HWND hwnd) //create animations, make buttons do actions
 {
     HDC hDC = GetDC(hwnd);
     PAINTSTRUCT Ps;
-
-    int positionDim1 = rand() % 16;
-    if(input == 'W')
+    if(CheckForValidMoves() == false)
     {
-        if(valueInPosition[positionDim1] * 2 == 2048)
-        {
-            valueInPosition[positionDim1] *= 2;
-            MessageBox( NULL, "You Won!", "", MB_OK );
-        }
-        else if (valueInPosition[positionDim1]!= 0) valueInPosition[positionDim1] *= 2; // game should end at 2048
-        else valueInPosition[positionDim1] = 2;
-        string RectangleValue = to_string(valueInPosition[positionDim1]);;
-        HBRUSH hBrush;
-        int R = pickColor(valueInPosition[positionDim1], 0);
-        int G = pickColor(valueInPosition[positionDim1], 1);
-        int B = pickColor(valueInPosition[positionDim1], 2);
-        hBrush = CreateSolidBrush (RGB(R, G, B));
-        SelectObject (hDC, hBrush);
-        RECT rect;
-        rect.left=possiblePositions[positionDim1][0];
-        rect.top=possiblePositions[positionDim1][1];
-        rect.right=possiblePositions[positionDim1][2];
-        rect.bottom=possiblePositions[positionDim1][3];
-
-        FillRect(hDC, &rect, hBrush);
-
-        RECT textRect;
-        textRect.left=possiblePositions[positionDim1][0]+47.5;
-        textRect.top=possiblePositions[positionDim1][1]+47.5;
-        textRect.right=possiblePositions[positionDim1][2]+47.5;
-        textRect.bottom=possiblePositions[positionDim1][3]+47.5;
-
-        DrawText( hDC, RectangleValue.c_str(), -1, &textRect, DT_SINGLELINE | DT_NOCLIP  );
-
-        UpdateWindow(hwnd);
+        MessageBox( NULL, "You Lost", "", MB_OK );
     }
-// RedrawWindow would work really well to redraw the window
-    if(input == 'D')
+    else
     {
-        //InvalidateRect(hwnd, NULL, TRUE);
-        RedrawWindow(hwnd, NULL, NULL, RDW_INVALIDATE | RDW_UPDATENOW);
-        UpdateWindow(hwnd);
+        if(g_input == 'W')
+        {
+            North();
+            RedrawBoard(hwnd);
+            UpdateWindow(hwnd);
+        }
+        if(g_input == 'S')
+        {
+            South();
+            RedrawBoard(hwnd);
+            UpdateWindow(hwnd);
+        }
+        if(g_input == 'D')
+        {
+            East();
+            RedrawBoard(hwnd);
+            UpdateWindow(hwnd);
+        }
+        if(g_input == 'A')
+        {
+            West();
+            RedrawBoard(hwnd);
+            UpdateWindow(hwnd);
+        }
+        if(g_input == 'T')
+        {
+            Test(hwnd);
+            //RedrawBoard(hwnd);
+            UpdateWindow(hwnd);
+        }
     }
     ReleaseDC(hwnd, hDC);
     EndPaint(hwnd, &Ps);
 }
-void calculateNewPositions() //function to recalculate new positions
+void Test(HWND hwnd)
 {
-
+    /*HDC hDC = GetDC(hwnd);
+    RoundRect(hDC, 10, 10, 105, 105, 5, 5);*/
 }
-void setPosition() //function to generate a new number
+//Ka daryt jeigu 0 ir nepasidaro i true
+void North()
 {
-    position = rand() % 16;
-}
-int getPosition() {
-    return position;
-}
-void updateSquareValue()
-{
-
-}
-void createNewSquare() //draw a new square after a button is pressed
-{
-
-}
-int pickColor(int value, int valueToReturn)
-{
-    int values[] = {2048, 1024, 512, 256, 128, 64, 32, 16, 8, 4, 2}; //11
-    int colorValues[][3] = {{53, 0, 51}, {70, 0, 60}, {85, 0, 64}, {99, 2, 66}, {112, 7, 65}, {123, 14, 62}, {139, 39, 102}, {155, 65, 138}, {171, 91, 170}, {174, 117, 186}, {181, 144, 201}, {192, 172, 215}};
-    // iterate from the end of colorValues cuz it goes from dark to light
-    int lengthOfValues = (sizeof(values)/sizeof(values[0]));
-    for(int i=0; i < lengthOfValues; i++)
+    bool legal_move = false;
+    for(int i=0; i<4; i++)
     {
-        if(value == values[i])
+        for(int j=0; j<4; j++)
         {
-            if(valueToReturn == 0)
+            while(g_value_in_position[i][j]==0 && g_value_in_position[i+1][j]!=0)
             {
-                int R = colorValues[i][0];
-                return R;
+                legal_move = true;
+                g_value_in_position[i][j]=g_value_in_position[i+1][j];
+                g_value_in_position[i+1][j]=0;
+                i=0;
             }
-            if(valueToReturn == 1)
+            //Combine if equal
+            if(g_value_in_position[i][j] == g_value_in_position[i+1][j])
             {
-                int G = colorValues[i][1];
-                return G;
-            }
-            if(valueToReturn == 2)
-            {
-                int B = colorValues[i][2];
-                return B;
+                legal_move = true;
+                g_value_in_position[i][j] += g_value_in_position[i+1][j];
+                g_value_in_position[i+1][j]=0;
             }
         }
     }
-    return 0;
+    if (legal_move == true && CheckForValidMoves() == true)
+    {
+        CreateNewSquare();
+    }
+}
+void South()
+{
+    bool legal_move = false;
+    for(int i=3; i>0; i--)
+    {
+        for(int j=0; j<4; j++)
+        {
+            while(g_value_in_position[i][j]==0 && g_value_in_position[i-1][j]!=0)
+            {
+                legal_move = true;
+                g_value_in_position[i][j]=g_value_in_position[i-1][j];
+                g_value_in_position[i-1][j]=0;
+                i=3;
+            }
+            //Combine if equal
+            if(g_value_in_position[i][j] == g_value_in_position[i-1][j])
+            {
+                legal_move = true;
+                g_value_in_position[i][j] += g_value_in_position[i-1][j];
+                g_value_in_position[i-1][j]=0;
+            }
+        }
+    }
+    if (legal_move == true && CheckForValidMoves() == true)
+    {
+        CreateNewSquare();
+    }
+}
+void East()
+{
+    bool legal_move = false;
+    for(int i=0; i<4; i++)
+    {
+        for(int j=3; j>0; j--)
+        {
+            while(g_value_in_position[i][j]==0 && g_value_in_position[i][j-1]!=0) // i 0  j 2
+            {
+                legal_move = true;
+                g_value_in_position[i][j]=g_value_in_position[i][j-1];
+                g_value_in_position[i][j-1]=0;
+                j=3;
+
+            }
+            //Combine if equal
+            if(g_value_in_position[i][j] == g_value_in_position[i][j-1])
+            {
+                legal_move = true;
+                g_value_in_position[i][j] += g_value_in_position[i][j-1];
+                g_value_in_position[i][j-1]=0;
+            }
+        }
+    }
+    if (legal_move == true && CheckForValidMoves() == true)
+    {
+        CreateNewSquare();
+    }
+}
+void West()
+{
+    bool legal_move = false;
+    for(int i=0; i<4; i++)
+    {
+        for(int j=0; j<3; j++)
+        {
+            while(g_value_in_position[i][j]==0 && g_value_in_position[i][j+1]!=0) // i 0  j 2
+            {
+                legal_move = true;
+                g_value_in_position[i][j]=g_value_in_position[i][j+1];
+                g_value_in_position[i][j+1]=0;
+                j=0;
+
+            }
+            //Combine if equal
+            if(g_value_in_position[i][j] == g_value_in_position[i][j+1])
+            {
+                legal_move = true;
+                g_value_in_position[i][j] += g_value_in_position[i][j+1];
+                g_value_in_position[i][j+1]=0;
+            }
+        }
+    }
+    if (legal_move == true && CheckForValidMoves() == true)
+    {
+        CreateNewSquare();
+    }
+}
+void RedrawBoard(HWND hwnd)
+{
+    HDC hDC = GetDC(hwnd);
+    HBRUSH hBrush;
+    RedrawWindow(hwnd, NULL, NULL, RDW_INVALIDATE | RDW_UPDATENOW);
+    for(int i=0; i<4; i++)
+    {
+        for(int j=0; j<4; j++)
+        {
+            int r = PickColor(g_value_in_position[i][j], 0);
+            int g = PickColor(g_value_in_position[i][j], 1);
+            int b = PickColor(g_value_in_position[i][j], 2);
+            hBrush = CreateSolidBrush (RGB(r, g, b));
+            SelectObject (hDC, hBrush);
+            RECT rect;
+            rect.left=g_possible_positions[i][j][0];
+            rect.top=g_possible_positions[i][j][1];
+            rect.right=g_possible_positions[i][j][2];
+            rect.bottom=g_possible_positions[i][j][3];
+            RoundRect(hDC,g_possible_positions[i][j][0], g_possible_positions[i][j][1], g_possible_positions[i][j][2], g_possible_positions[i][j][3], 5, 5);
+            string RectangleValue = to_string(g_value_in_position[i][j]);;
+            //FillRect(hDC, &rect, nullptr);
+
+            DrawText(hDC, RectangleValue.c_str(), -1, &rect, DT_SINGLELINE | DT_NOCLIP | DT_CENTER | DT_VCENTER);
+        }
+    }
+}
+bool CheckForValidMoves()
+{
+    bool move_exists=false;
+    for(int i = 0; i<4; i++)
+    {
+        for(int j=0; j<4; j++)
+        {
+            if(g_value_in_position[i][j]==0)
+            {
+                move_exists=true;
+            }
+        }
+    }
+    return move_exists;
+}
+void CreateNewSquare() //draw a new square after a button is pressed
+{
+    srand((unsigned int) time (NULL));
+    int random_x = rand()%4;
+    int random_y = rand()%4;
+    int random_value = rand()%10;
+    //Checking if there are empty squares
+    while(g_value_in_position[random_x][random_y] != 0)
+    {
+        random_x = rand()%4;
+        random_y = rand()%4;
+    }
+    if(random_value < 8)
+    {
+        random_value = 2;
+    }
+    else
+    {
+        random_value = 4;
+    }
+    g_value_in_position[random_x][random_y] = random_value;
+    for(int i=0; i<4; i++)
+    {
+        for(int j=0; j<4; j++)
+        {
+            std::cout<<g_value_in_position[i][j]<<" ";
+        }
+        std::cout<<std::endl;
+    }
+    std::cout<<std::endl;
+
+
+}
+
+int PickColor(int value, int value_to_return)
+{
+    int values[] = {2048, 1024, 512, 256, 128, 64, 32, 16, 8, 4, 2}; //11
+    int color_values[][3] = {{237, 194, 46}, {237, 197, 63}, {237, 200, 80}, {237, 204, 97}, {237, 207, 114}, {246, 94, 59}, {246, 124, 95}, {245, 149, 99}, {242, 177, 121},{237, 224, 200}, {238, 228, 218}};
+    // iterate from the end of colorValues cuz it goes from dark to light
+    int length_of_values = (sizeof(values)/sizeof(values[0]));
+    for(int i=0; i < length_of_values; i++)
+    {
+        if(value == values[i])
+        {
+            if(value_to_return == 0)
+            {
+                int r = color_values[i][0];
+                return r;
+            }
+            if(value_to_return == 1)
+            {
+                int g = color_values[i][1];
+                return g;
+            }
+            if(value_to_return == 2)
+            {
+                int b = color_values[i][2];
+                return b;
+            }
+        }
+    }
+    return 255;
 }
