@@ -4,24 +4,27 @@
 #define UNICODE
 #endif
 
-#define FILE_MENU_NEW 1
-#define FILE_MENU_BACK 2
-#define FILE_MENU_EXIT 3
-#define FILE_MENU_CONTROLS 4
-
 #include <iostream>
 #include <tchar.h>
 #include <windows.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <time.h>
+#include <fstream>
+
+#define FILE_MENU_NEW 1
+#define FILE_MENU_BACK 2
+#define FILE_MENU_EXIT 3
+#define FILE_MENU_CONTROLS 4
+#define BTN_NEW 5
 
 using namespace std;
 /*  Declare Windows procedure  */
 LRESULT CALLBACK WindowProcedure (HWND, UINT, WPARAM, LPARAM);
 
 void AddMenu(HWND);
-void NewGame();
+void NewGame(HWND);
+void RestartGame();
 void GamePaint(char, HWND);
 void DrawBoard(HWND);
 void North();
@@ -31,12 +34,30 @@ void West();
 void Test(HWND);
 void CreateNewSquare();
 void RedrawBoard(HWND);
-bool CheckForValidMoves();
+void DrawBoard(HWND);
+void DrawScore(int, HWND);
+void CheckForValidMoves();
+void ReadHighScores();
+void WriteHighScore(int);
+void DrawHighScore(HWND);
 int PickColor(int, int);
 
 HMENU hMenu;
+HWND button_new;
 char g_input;
 int g_possible_positions[4][4][4] =
+{
+    {{16, 83, 112, 183},     {117, 83, 213, 183},    {218, 83, 314, 183},    {319, 83, 415, 183}},
+    //
+    {{16, 188, 112, 288},    {117, 188, 213, 288},   {218, 188, 314, 288},   {319, 188, 415, 288}},
+    //
+    {{16, 293, 112, 393},    {117, 293, 213, 393},   {218, 293, 314, 393},   {319, 293, 415, 393}},
+    //
+    {{16, 398, 112, 498},    {117, 398, 213, 498},   {218, 398, 314, 498},   {319, 398, 415, 498}},
+    //96
+};
+
+/*int g_possible_positions[4][4][4] =
 {
     {{10, 10, 105, 105},     {105, 10, 210, 105},    {210, 10, 315, 105},    {315, 10, 420, 105}},
     //
@@ -46,8 +67,11 @@ int g_possible_positions[4][4][4] =
     //
     {{10, 315, 105, 420},    {105, 315, 210, 420},   {210, 315, 315, 420},   {315, 315, 420, 420}},
     //
-};
+};*/
+int g_high_score = 0;
 int g_value_in_position[4][4] = {0};
+bool g_new_game = true;
+const string g_high_score_file = "High_scores.txt";
 
 /*  Make the class name into a global variable  */
 TCHAR szClassName[ ] = _T("CodeBlocksWindowsApp");
@@ -77,7 +101,9 @@ int WINAPI WinMain (HINSTANCE hThisInstance,
     wincl.cbClsExtra = 0;                      /* No extra bytes after the window class */
     wincl.cbWndExtra = 0;                      /* structure or the window instance */
     /* Use Windows's default colour as the background of the window */
-    wincl.hbrBackground = (HBRUSH)GetStockObject(WHITE_BRUSH);
+    HBRUSH window_background_color;
+    window_background_color = CreateSolidBrush (RGB(240, 238, 229));
+    wincl.hbrBackground = window_background_color;
 
     /* Register the window class, and if it fails quit the program */
     if (!RegisterClassEx (&wincl))
@@ -88,11 +114,11 @@ int WINAPI WinMain (HINSTANCE hThisInstance,
                0,                   /* Extended possibilites for variation */
                szClassName,         /* Classname */
                _T("Dano App"),       /* Title Text */
-               WS_OVERLAPPEDWINDOW,          /* default window *changed to non-resizable */
+               WS_MINIMIZEBOX | WS_SYSMENU,          /* default window *changed to non-resizable */
                CW_USEDEFAULT,       /* Windows decides the position */
                CW_USEDEFAULT,       /* where the window ends up on the screen */
-               445,                 /* The programs width */
-               490,                 /* and height in pixels */
+               435,                 /* The programs width */
+               560,                 /* and height in pixels */
                HWND_DESKTOP,        /* The window is a child-window to desktop */
                NULL,                /* No menu */
                hThisInstance,       /* Program Instance handler */
@@ -129,7 +155,9 @@ LRESULT CALLBACK WindowProcedure (HWND hwnd, UINT message, WPARAM wParam, LPARAM
             DestroyWindow(hwnd);
             break;
         case FILE_MENU_NEW:
-            NewGame();
+            ReadHighScores();
+            std::cout<<g_high_score<<std::endl;
+            RestartGame();
             RedrawBoard(hwnd);
             //MessageBeep(MB_DEFBUTTON1);
             break;
@@ -139,17 +167,24 @@ LRESULT CALLBACK WindowProcedure (HWND hwnd, UINT message, WPARAM wParam, LPARAM
         case FILE_MENU_CONTROLS:
             MessageBox( nullptr, TEXT( "Controls: \n W A S D to Move the rectangles." ), TEXT( "Message" ), MB_OK );
             break;
+        case BTN_NEW:
+            DestroyWindow(button_new);
+            RestartGame();
+            RedrawBoard(hwnd);
+            break;
         }
 
         break;
-    case WM_PAINT:
+    /*case WM_PAINT:
     {
         HDC hDC;
         PAINTSTRUCT Ps;
         hDC = BeginPaint(hwnd, &Ps);
+        AddMenu(hwnd);
         Rectangle(hDC, 9, 9, 421, 421);
         EndPaint(hwnd, &Ps);
-    }
+        break;
+    }*/
     case WM_KEYDOWN:
     {
         switch(wParam)
@@ -172,7 +207,15 @@ LRESULT CALLBACK WindowProcedure (HWND hwnd, UINT message, WPARAM wParam, LPARAM
         }
     }
     case WM_CREATE:
+        HDC hDC;
+        PAINTSTRUCT Ps;
+        hDC = BeginPaint(hwnd, &Ps);
+        if(g_new_game == true)
+        {
+            NewGame(hwnd);
+        }
         AddMenu(hwnd);
+        EndPaint(hwnd, &Ps);
         break;
     case WM_DESTROY:
         PostQuitMessage (0);       /* send a WM_QUIT to the message queue */
@@ -195,8 +238,9 @@ void AddMenu(HWND hwnd)
 
     SetMenu(hwnd, hMenu);
 }
-void NewGame()
+void RestartGame()
 {
+
     for(int i=0; i<4; i++)
     {
         for(int j=0; j<4; j++)
@@ -204,47 +248,58 @@ void NewGame()
             g_value_in_position[i][j] = 0;
         }
     }
+    CreateNewSquare();
+}
+void NewGame(HWND hwnd)
+{
+    ReadHighScores();
+    std::cout<<g_high_score;
+    g_new_game = false;
+    HDC hDC = GetDC(hwnd);
+    PAINTSTRUCT Ps;
+    button_new = CreateWindow(
+                     "BUTTON",  // Predefined class; Unicode assumed
+                     "New Game",      // Button text
+                     WS_TABSTOP | WS_VISIBLE | WS_CHILD | BS_PUSHBUTTON, // Styles
+                     160,         // x position
+                     160,         // y position
+                     100,        // Button width
+                     50,        // Button height
+                     hwnd,     // Parent window
+                     (HMENU) BTN_NEW,       // No menu.
+                     NULL,
+                     NULL);      // Pointer not needed.
+    ReleaseDC(hwnd, hDC);
+    EndPaint(hwnd, &Ps);
 }
 void GamePaint(char g_input, HWND hwnd) //create animations, make buttons do actions
 {
     HDC hDC = GetDC(hwnd);
     PAINTSTRUCT Ps;
-    if(CheckForValidMoves() == false)
+    CheckForValidMoves();
+    if(g_input == 'W')
     {
-        MessageBox( NULL, "You Lost", "", MB_OK );
+        North();
+        RedrawBoard(hwnd);
+        UpdateWindow(hwnd);
     }
-    else
+    if(g_input == 'S')
     {
-        if(g_input == 'W')
-        {
-            North();
-            RedrawBoard(hwnd);
-            UpdateWindow(hwnd);
-        }
-        if(g_input == 'S')
-        {
-            South();
-            RedrawBoard(hwnd);
-            UpdateWindow(hwnd);
-        }
-        if(g_input == 'D')
-        {
-            East();
-            RedrawBoard(hwnd);
-            UpdateWindow(hwnd);
-        }
-        if(g_input == 'A')
-        {
-            West();
-            RedrawBoard(hwnd);
-            UpdateWindow(hwnd);
-        }
-        if(g_input == 'T')
-        {
-            Test(hwnd);
-            //RedrawBoard(hwnd);
-            UpdateWindow(hwnd);
-        }
+        South();
+        RedrawBoard(hwnd);
+        UpdateWindow(hwnd);
+    }
+    if(g_input == 'D')
+    {
+        East();
+        RedrawBoard(hwnd);
+        UpdateWindow(hwnd);
+    }
+    if(g_input == 'A')
+    {
+        West();
+        RedrawBoard(hwnd);
+        UpdateWindow(hwnd);
     }
     ReleaseDC(hwnd, hDC);
     EndPaint(hwnd, &Ps);
@@ -264,21 +319,24 @@ void North()
         {
             while(g_value_in_position[i][j]==0 && g_value_in_position[i+1][j]!=0)
             {
+                std::cout<<g_value_in_position[i][j]<<" "<< g_value_in_position[i+1][j]<<std::endl;
                 legal_move = true;
                 g_value_in_position[i][j]=g_value_in_position[i+1][j];
                 g_value_in_position[i+1][j]=0;
                 i=0;
             }
             //Combine if equal
-            if(g_value_in_position[i][j] == g_value_in_position[i+1][j])
+            if(g_value_in_position[i][j] == g_value_in_position[i+1][j] && g_value_in_position[i][j] != 0)
             {
                 legal_move = true;
+                std::cout<<legal_move<<std::endl;
                 g_value_in_position[i][j] += g_value_in_position[i+1][j];
                 g_value_in_position[i+1][j]=0;
             }
         }
     }
-    if (legal_move == true && CheckForValidMoves() == true)
+
+    if (legal_move == true)
     {
         CreateNewSquare();
     }
@@ -298,7 +356,7 @@ void South()
                 i=3;
             }
             //Combine if equal
-            if(g_value_in_position[i][j] == g_value_in_position[i-1][j])
+            if(g_value_in_position[i][j] == g_value_in_position[i-1][j] && g_value_in_position[i][j] != 0)
             {
                 legal_move = true;
                 g_value_in_position[i][j] += g_value_in_position[i-1][j];
@@ -306,7 +364,8 @@ void South()
             }
         }
     }
-    if (legal_move == true && CheckForValidMoves() == true)
+
+    if (legal_move == true)
     {
         CreateNewSquare();
     }
@@ -321,21 +380,24 @@ void East()
             while(g_value_in_position[i][j]==0 && g_value_in_position[i][j-1]!=0) // i 0  j 2
             {
                 legal_move = true;
+                std::cout<<"0"<<endl;
                 g_value_in_position[i][j]=g_value_in_position[i][j-1];
                 g_value_in_position[i][j-1]=0;
                 j=3;
 
             }
             //Combine if equal
-            if(g_value_in_position[i][j] == g_value_in_position[i][j-1])
+            if(g_value_in_position[i][j] == g_value_in_position[i][j-1] && g_value_in_position[i][j] != 0)
             {
                 legal_move = true;
+                std::cout<<"1"<<endl;
                 g_value_in_position[i][j] += g_value_in_position[i][j-1];
                 g_value_in_position[i][j-1]=0;
             }
         }
     }
-    if (legal_move == true && CheckForValidMoves() == true)
+
+    if (legal_move == true)
     {
         CreateNewSquare();
     }
@@ -356,7 +418,7 @@ void West()
 
             }
             //Combine if equal
-            if(g_value_in_position[i][j] == g_value_in_position[i][j+1])
+            if(g_value_in_position[i][j] == g_value_in_position[i][j+1] && g_value_in_position[i][j] != 0)
             {
                 legal_move = true;
                 g_value_in_position[i][j] += g_value_in_position[i][j+1];
@@ -364,7 +426,8 @@ void West()
             }
         }
     }
-    if (legal_move == true && CheckForValidMoves() == true)
+
+    if (legal_move == true)
     {
         CreateNewSquare();
     }
@@ -373,11 +436,15 @@ void RedrawBoard(HWND hwnd)
 {
     HDC hDC = GetDC(hwnd);
     HBRUSH hBrush;
+    int sum = 0;
     RedrawWindow(hwnd, NULL, NULL, RDW_INVALIDATE | RDW_UPDATENOW);
+    DrawBoard(hwnd);
+    //Number drawing
     for(int i=0; i<4; i++)
     {
         for(int j=0; j<4; j++)
         {
+            sum += g_value_in_position[i][j];
             int r = PickColor(g_value_in_position[i][j], 0);
             int g = PickColor(g_value_in_position[i][j], 1);
             int b = PickColor(g_value_in_position[i][j], 2);
@@ -388,28 +455,157 @@ void RedrawBoard(HWND hwnd)
             rect.top=g_possible_positions[i][j][1];
             rect.right=g_possible_positions[i][j][2];
             rect.bottom=g_possible_positions[i][j][3];
-            RoundRect(hDC,g_possible_positions[i][j][0], g_possible_positions[i][j][1], g_possible_positions[i][j][2], g_possible_positions[i][j][3], 5, 5);
-            string RectangleValue = to_string(g_value_in_position[i][j]);;
-            //FillRect(hDC, &rect, nullptr);
-
+            RoundRect(hDC,g_possible_positions[i][j][0], g_possible_positions[i][j][1], g_possible_positions[i][j][2], g_possible_positions[i][j][3], 10, 10);
+            string RectangleValue = to_string(g_value_in_position[i][j]);
+            SetBkColor(hDC, RGB(r, g, b));
             DrawText(hDC, RectangleValue.c_str(), -1, &rect, DT_SINGLELINE | DT_NOCLIP | DT_CENTER | DT_VCENTER);
         }
     }
+    DrawScore(sum, hwnd);
+    DrawHighScore(hwnd);
+
 }
-bool CheckForValidMoves()
+void DrawBoard(HWND hwnd)
+{
+    HDC hDC = GetDC(hwnd);
+    HBRUSH game_background_color;
+    game_background_color = CreateSolidBrush (RGB(167, 153, 140));
+    SelectObject (hDC, game_background_color);
+    RECT game_background_rectangle;
+    game_background_rectangle.left = 10;
+    game_background_rectangle.top = 77;
+    game_background_rectangle.right = 421;
+    game_background_rectangle.bottom = 504;
+    FillRect(hDC, &game_background_rectangle, game_background_color);
+}
+void DrawScore(int sum, HWND hwnd)
+{
+    HDC hDC = GetDC(hwnd);
+    HBRUSH score_background_color;
+    score_background_color = CreateSolidBrush (RGB(207, 193, 180));
+    SelectObject (hDC, score_background_color);
+    RoundRect(hDC,10,10,160,60,10,10);
+
+    RECT game_score_rectangle;
+    game_score_rectangle.left = 10;
+    game_score_rectangle.top = 22;
+    game_score_rectangle.right = 160;
+    game_score_rectangle.bottom = 70;
+
+    string game_score = to_string(sum);
+    SetBkColor(hDC, RGB(207, 193, 180));
+    DrawText(hDC, game_score.c_str(),-1, &game_score_rectangle, DT_SINGLELINE | DT_NOCLIP | DT_CENTER | DT_VCENTER);
+
+    RECT score_string_rectangle;
+    score_string_rectangle.left = 10;
+    score_string_rectangle.top = 0;
+    score_string_rectangle.right = 160;
+    score_string_rectangle.bottom = 40;
+    DrawText(hDC,"SCORE",5, &score_string_rectangle, DT_SINGLELINE | DT_NOCLIP | DT_CENTER | DT_VCENTER);
+}
+void DrawHighScore(HWND hwnd)
+{
+    HDC hDC = GetDC(hwnd);
+    HBRUSH score_background_color;
+    score_background_color = CreateSolidBrush (RGB(207, 193, 180));
+    SelectObject (hDC, score_background_color);
+    RoundRect(hDC,271,10,421,60,10,10);
+
+    RECT game_score_rectangle;
+    game_score_rectangle.left = 271;
+    game_score_rectangle.top = 22;
+    game_score_rectangle.right = 421;
+    game_score_rectangle.bottom = 70;
+
+    string high_score = to_string(g_high_score);
+    SetBkColor(hDC, RGB(207, 193, 180));
+    DrawText(hDC, high_score.c_str(),-1, &game_score_rectangle, DT_SINGLELINE | DT_NOCLIP | DT_CENTER | DT_VCENTER);
+
+    RECT score_string_rectangle;
+    score_string_rectangle.left = 274;
+    score_string_rectangle.top = 0;
+    score_string_rectangle.right = 421;
+    score_string_rectangle.bottom = 40;
+    DrawText(hDC,"HIGH SCORE",10, &score_string_rectangle, DT_SINGLELINE | DT_NOCLIP | DT_CENTER | DT_VCENTER);
+}
+void CheckForValidMoves()
 {
     bool move_exists=false;
-    for(int i = 0; i<4; i++)
+    //North
+    for(int i=0; i<4; i++)
     {
         for(int j=0; j<4; j++)
         {
-            if(g_value_in_position[i][j]==0)
+            if(g_value_in_position[i][j]==0 && g_value_in_position[i+1][j]!=0)
             {
-                move_exists=true;
+                move_exists = true;
+            }
+            if(g_value_in_position[i][j] == g_value_in_position[i+1][j] && g_value_in_position[i][j] != 0)
+            {
+                move_exists = true;
             }
         }
     }
-    return move_exists;
+    //South
+    for(int i=3; i>0; i--)
+    {
+        for(int j=0; j<4; j++)
+        {
+            if(g_value_in_position[i][j]==0 && g_value_in_position[i-1][j]!=0)
+            {
+                move_exists = true;
+            }
+            if(g_value_in_position[i][j] == g_value_in_position[i-1][j])
+            {
+                move_exists = true;
+            }
+        }
+    }
+    //East
+    for(int i=0; i<4; i++)
+    {
+        for(int j=3; j>0; j--)
+        {
+            if(g_value_in_position[i][j]==0 && g_value_in_position[i][j-1]!=0)
+            {
+                move_exists = true;
+            }
+            //Combine if equal
+            if(g_value_in_position[i][j] == g_value_in_position[i][j-1])
+            {
+                move_exists = true;
+            }
+        }
+    }
+    //West
+    for(int i=0; i<4; i++)
+    {
+        for(int j=0; j<3; j++)
+        {
+            if(g_value_in_position[i][j]==0 && g_value_in_position[i][j+1]!=0)
+            {
+                move_exists = true;
+            }
+            if(g_value_in_position[i][j] == g_value_in_position[i][j+1])
+            {
+                move_exists = true;
+            }
+        }
+    }
+
+    if(move_exists == false)
+    {
+        int sum = 0;
+        for(int i=0; i<4; i++)
+        {
+            for(int j=0; j<4; j++)
+            {
+                sum+= g_value_in_position[i][j];
+            }
+        }
+        WriteHighScore(sum);
+        MessageBox( NULL, "You Lost", "", MB_OK );
+    }
 }
 void CreateNewSquare() //draw a new square after a button is pressed
 {
@@ -441,14 +637,12 @@ void CreateNewSquare() //draw a new square after a button is pressed
         std::cout<<std::endl;
     }
     std::cout<<std::endl;
-
-
 }
 
 int PickColor(int value, int value_to_return)
 {
-    int values[] = {2048, 1024, 512, 256, 128, 64, 32, 16, 8, 4, 2}; //11
-    int color_values[][3] = {{237, 194, 46}, {237, 197, 63}, {237, 200, 80}, {237, 204, 97}, {237, 207, 114}, {246, 94, 59}, {246, 124, 95}, {245, 149, 99}, {242, 177, 121},{237, 224, 200}, {238, 228, 218}};
+    int values[] = {2048, 1024, 512, 256, 128, 64, 32, 16, 8, 4, 2, 0}; //11
+    int color_values[][3] = {{237, 194, 46}, {237, 197, 63}, {237, 200, 80}, {237, 204, 97}, {237, 207, 114}, {246, 94, 59}, {246, 124, 95}, {245, 149, 99}, {242, 177, 121},{237, 224, 200}, {238, 228, 218}, {205, 193, 180}};
     // iterate from the end of colorValues cuz it goes from dark to light
     int length_of_values = (sizeof(values)/sizeof(values[0]));
     for(int i=0; i < length_of_values; i++)
@@ -473,4 +667,30 @@ int PickColor(int value, int value_to_return)
         }
     }
     return 255;
+}
+void ReadHighScores()
+{
+    ifstream input(g_high_score_file);
+    string line;
+    if(input.is_open())
+    {
+        while(std::getline(input, line))
+        {
+            //std::cout<<line<<std::endl;
+            int score = stoi(line);
+            if(score > g_high_score) g_high_score = score;
+        }
+    }
+}
+void WriteHighScore(int score)
+{
+    std::cout<<score<<std::endl;
+    ofstream output;
+    output.open(g_high_score_file, fstream::app);
+    if(score > g_high_score)
+    {
+        output<<score;
+        output<<"\r\n";
+    }
+    output.close();
 }
