@@ -1,9 +1,10 @@
 # depslib dependency file v1.0
-1605474787 source:c:\users\alisa\desktop\api projektas\projektas\main.cpp
+1607796606 source:c:\users\alisa\desktop\api projektas\projektas\main.cpp
 	<iostream>
 	<tchar.h>
 	<windows.h>
 	<stdio.h>
 	<stdlib.h>
 	<time.h>
+	<fstream>
 
