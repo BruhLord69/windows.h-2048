@@ -42,6 +42,7 @@ void WriteHighScore(int);
 void DrawHighScore(HWND);
 int PickColor(int, int);
 
+HBITMAP hBitmap = NULL;
 HMENU hMenu;
 HWND button_new;
 char g_input;
@@ -54,20 +55,8 @@ int g_possible_positions[4][4][4] =
     {{16, 293, 112, 393},    {117, 293, 213, 393},   {218, 293, 314, 393},   {319, 293, 415, 393}},
     //
     {{16, 398, 112, 498},    {117, 398, 213, 498},   {218, 398, 314, 498},   {319, 398, 415, 498}},
-    //96
+    //
 };
-
-/*int g_possible_positions[4][4][4] =
-{
-    {{10, 10, 105, 105},     {105, 10, 210, 105},    {210, 10, 315, 105},    {315, 10, 420, 105}},
-    //
-    {{10, 105, 105, 210},    {105, 105, 210, 210},   {210, 105, 315, 210},   {315, 105, 420, 210}},
-    //
-    {{10, 210, 105, 315},    {105, 210, 210, 315},   {210, 210, 315, 315},   {315, 210, 420, 315}},
-    //
-    {{10, 315, 105, 420},    {105, 315, 210, 420},   {210, 315, 315, 420},   {315, 315, 420, 420}},
-    //
-};*/
 int g_high_score = 0;
 int g_value_in_position[4][4] = {0};
 bool g_new_game = true;
@@ -175,16 +164,6 @@ LRESULT CALLBACK WindowProcedure (HWND hwnd, UINT message, WPARAM wParam, LPARAM
         }
 
         break;
-    /*case WM_PAINT:
-    {
-        HDC hDC;
-        PAINTSTRUCT Ps;
-        hDC = BeginPaint(hwnd, &Ps);
-        AddMenu(hwnd);
-        Rectangle(hDC, 9, 9, 421, 421);
-        EndPaint(hwnd, &Ps);
-        break;
-    }*/
     case WM_KEYDOWN:
     {
         switch(wParam)
@@ -209,7 +188,9 @@ LRESULT CALLBACK WindowProcedure (HWND hwnd, UINT message, WPARAM wParam, LPARAM
     case WM_CREATE:
         HDC hDC;
         PAINTSTRUCT Ps;
+
         hDC = BeginPaint(hwnd, &Ps);
+
         if(g_new_game == true)
         {
             NewGame(hwnd);
@@ -253,10 +234,9 @@ void RestartGame()
 void NewGame(HWND hwnd)
 {
     ReadHighScores();
-    std::cout<<g_high_score;
     g_new_game = false;
     HDC hDC = GetDC(hwnd);
-    PAINTSTRUCT Ps;
+
     button_new = CreateWindow(
                      "BUTTON",  // Predefined class; Unicode assumed
                      "New Game",      // Button text
@@ -266,13 +246,15 @@ void NewGame(HWND hwnd)
                      100,        // Button width
                      50,        // Button height
                      hwnd,     // Parent window
-                     (HMENU) BTN_NEW,       // No menu.
+                     (HMENU) BTN_NEW,
                      NULL,
                      NULL);      // Pointer not needed.
+
+
+    HBRUSH brush = CreatePatternBrush((HBITMAP)LoadImage(NULL, "Background.bmp", IMAGE_BITMAP, 0, 0, LR_LOADFROMFILE));
     ReleaseDC(hwnd, hDC);
-    EndPaint(hwnd, &Ps);
 }
-void GamePaint(char g_input, HWND hwnd) //create animations, make buttons do actions
+void GamePaint(char g_input, HWND hwnd)
 {
     HDC hDC = GetDC(hwnd);
     PAINTSTRUCT Ps;
@@ -281,35 +263,25 @@ void GamePaint(char g_input, HWND hwnd) //create animations, make buttons do act
     {
         North();
         RedrawBoard(hwnd);
-        UpdateWindow(hwnd);
     }
     if(g_input == 'S')
     {
         South();
         RedrawBoard(hwnd);
-        UpdateWindow(hwnd);
     }
     if(g_input == 'D')
     {
         East();
         RedrawBoard(hwnd);
-        UpdateWindow(hwnd);
     }
     if(g_input == 'A')
     {
         West();
         RedrawBoard(hwnd);
-        UpdateWindow(hwnd);
     }
     ReleaseDC(hwnd, hDC);
     EndPaint(hwnd, &Ps);
 }
-void Test(HWND hwnd)
-{
-    /*HDC hDC = GetDC(hwnd);
-    RoundRect(hDC, 10, 10, 105, 105, 5, 5);*/
-}
-//Ka daryt jeigu 0 ir nepasidaro i true
 void North()
 {
     bool legal_move = false;
@@ -319,7 +291,6 @@ void North()
         {
             while(g_value_in_position[i][j]==0 && g_value_in_position[i+1][j]!=0)
             {
-                std::cout<<g_value_in_position[i][j]<<" "<< g_value_in_position[i+1][j]<<std::endl;
                 legal_move = true;
                 g_value_in_position[i][j]=g_value_in_position[i+1][j];
                 g_value_in_position[i+1][j]=0;
@@ -329,7 +300,6 @@ void North()
             if(g_value_in_position[i][j] == g_value_in_position[i+1][j] && g_value_in_position[i][j] != 0)
             {
                 legal_move = true;
-                std::cout<<legal_move<<std::endl;
                 g_value_in_position[i][j] += g_value_in_position[i+1][j];
                 g_value_in_position[i+1][j]=0;
             }
@@ -364,7 +334,6 @@ void South()
             }
         }
     }
-
     if (legal_move == true)
     {
         CreateNewSquare();
@@ -380,7 +349,6 @@ void East()
             while(g_value_in_position[i][j]==0 && g_value_in_position[i][j-1]!=0) // i 0  j 2
             {
                 legal_move = true;
-                std::cout<<"0"<<endl;
                 g_value_in_position[i][j]=g_value_in_position[i][j-1];
                 g_value_in_position[i][j-1]=0;
                 j=3;
@@ -390,13 +358,11 @@ void East()
             if(g_value_in_position[i][j] == g_value_in_position[i][j-1] && g_value_in_position[i][j] != 0)
             {
                 legal_move = true;
-                std::cout<<"1"<<endl;
                 g_value_in_position[i][j] += g_value_in_position[i][j-1];
                 g_value_in_position[i][j-1]=0;
             }
         }
     }
-
     if (legal_move == true)
     {
         CreateNewSquare();
@@ -628,15 +594,6 @@ void CreateNewSquare() //draw a new square after a button is pressed
         random_value = 4;
     }
     g_value_in_position[random_x][random_y] = random_value;
-    for(int i=0; i<4; i++)
-    {
-        for(int j=0; j<4; j++)
-        {
-            std::cout<<g_value_in_position[i][j]<<" ";
-        }
-        std::cout<<std::endl;
-    }
-    std::cout<<std::endl;
 }
 
 int PickColor(int value, int value_to_return)
@@ -676,7 +633,6 @@ void ReadHighScores()
     {
         while(std::getline(input, line))
         {
-            //std::cout<<line<<std::endl;
             int score = stoi(line);
             if(score > g_high_score) g_high_score = score;
         }
@@ -684,7 +640,6 @@ void ReadHighScores()
 }
 void WriteHighScore(int score)
 {
-    std::cout<<score<<std::endl;
     ofstream output;
     output.open(g_high_score_file, fstream::app);
     if(score > g_high_score)
